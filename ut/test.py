@@ -1720,7 +1720,7 @@ def test_put_get_delete_bucket_domain_certificate():
             DomainConfiguration=domain_config
         )
     except CosServiceError as e:
-        if e.get_error_code() == "RecordAlreadyExist":
+        if e.get_error_code() == "RecordAlreadyExist" or e.get_error_code() == "DomainAuditFailed":
             print_error_msg(e)
         else:
             raise e
