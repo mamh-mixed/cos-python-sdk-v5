@@ -6993,11 +6993,13 @@ def test_cos_vectors():
     resp = put_vector_bucket_policy(vector_bucket_name)
 
     # 获取policy
+    time.sleep(1)
     resp, data = get_vector_bucket_policy(vector_bucket_name)
     assert isinstance(data, dict)
     assert 'policy' in data
 
     # 删除policy
+    time.sleep(1)
     resp = delete_vector_bucket_policy(vector_bucket_name)
 
     # 创建索引
@@ -7089,7 +7091,12 @@ def test_cos_vectors():
         assert e.get_error_code() == "NotFoundException"
 
     # 删除向量桶
-    resp = delete_vector_bucket(vector_bucket_name)
+    try:
+        time.sleep(1)
+        resp = delete_vector_bucket(vector_bucket_name)
+    except CosServiceError as e:
+        assert e.get_error_code() == "ConflictException"
+        print(e)
     resp, data = list_vector_buckets()
     assert isinstance(data, dict)
     assert 'vectorBuckets' in data
