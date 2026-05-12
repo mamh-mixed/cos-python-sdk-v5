@@ -17,8 +17,8 @@ class CosVectorsClient(CosS3Client):
             :type SseType: string
             :param kwargs: 设置上传的headers.
             :type kwargs: dict
-            :return: response header.
-            :rtype: dict
+            :return: response header 和请求成功返回的结果.
+            :rtype: tuple(dict, dict)
 
             .. code-block:: python
 
@@ -64,10 +64,8 @@ class CosVectorsClient(CosS3Client):
             :type Bucket: string
             :param kwargs: 设置上传的headers.
             :type kwargs: dict
-            :return: response header.
-            :rtype: dict
-            :return: 请求成功返回的结果,dict类型.
-            :rtype: dict
+            :return: response header 和请求成功返回的结果.
+            :rtype: tuple(dict, dict)
 
             .. code-block:: python
 
@@ -109,12 +107,16 @@ class CosVectorsClient(CosS3Client):
     def list_vector_buckets(self, MaxResults=None, NextToken=None, Prefix=None, **kwargs):
         """ 获取向量存储桶列表
 
+            :param MaxResults: 最大返回结果数.
+            :type MaxResults: int
+            :param NextToken: 下一页的token.
+            :type NextToken: string
+            :param Prefix: 向量存储桶名称前缀.
+            :type Prefix: string
             :param kwargs: 设置上传的headers.
             :type kwargs: dict
-            :return: response header.
-            :rtype: dict
-            :return: 请求成功返回的结果,dict类型.
-            :rtype: dict
+            :return: response header 和请求成功返回的结果.
+            :rtype: tuple(dict, dict)
 
             .. code-block:: python
 
@@ -122,7 +124,9 @@ class CosVectorsClient(CosS3Client):
                 config = CosConfig(Region=region, SecretId=secret_id, SecretKey=secret_key, Domain=domain)
                 client = CosVectorsClient(config)
                 # 获取向量桶列表
-                resp, data = client.list_vector_buckets()
+                resp, data = client.list_vector_buckets(
+                    MaxResults=10,
+                    Prefix="example")
                 print(resp)
                 print(data)
 
@@ -217,10 +221,8 @@ class CosVectorsClient(CosS3Client):
             :type NonFilterableMetadataKeys: list
             :param kwargs: 设置上传的headers.
             :type kwargs: dict
-            :return: response header.
-            :rtype: dict
-            :return: 请求成功返回的结果,dict类型.
-            :rtype: dict
+            :return: response header 和请求成功返回的结果.
+            :rtype: tuple(dict, dict)
 
             .. code-block:: python
 
@@ -279,10 +281,8 @@ class CosVectorsClient(CosS3Client):
             :type Index: string
             :param kwargs: 设置上传的headers.
             :type kwargs: dict
-            :return: response header.
-            :rtype: dict
-            :return: 请求成功返回的结果,dict类型.
-            :rtype: dict
+            :return: response header 和请求成功返回的结果.
+            :rtype: tuple(dict, dict)
 
             .. code-block:: python
 
@@ -334,10 +334,8 @@ class CosVectorsClient(CosS3Client):
             :type Prefix: string
             :param kwargs: 设置上传的headers.
             :type kwargs: dict
-            :return: response header.
-            :rtype: dict
-            :return: 请求成功返回的结果,dict类型.
-            :rtype: dict
+            :return: response header 和请求成功返回的结果.
+            :rtype: tuple(dict, dict)
 
             .. code-block:: python
 
@@ -507,10 +505,8 @@ class CosVectorsClient(CosS3Client):
             :type ReturnMetaData: bool
             :param kwargs: 设置上传的headers.
             :type kwargs: dict
-            :return: response header.
-            :rtype: dict
-            :return: 请求成功返回的结果,dict类型.
-            :rtype: dict
+            :return: response header 和请求成功返回的结果.
+            :rtype: tuple(dict, dict)
 
             .. code-block:: python
 
@@ -580,13 +576,11 @@ class CosVectorsClient(CosS3Client):
             :param SegmentIndex: 分段索引, 从0开始.
             :type SegmentIndex: int
             :param Filter: 过滤条件, 例如{"metadata": {"$eq": "value1"}}, 语法详见接口文档.
-            :type Filter: string
+            :type Filter: dict
             :param kwargs: 设置上传的headers.
             :type kwargs: dict
-            :return: response header.
-            :rtype: dict
-            :return: 请求成功返回的结果,dict类型.
-            :rtype: dict
+            :return: response header 和请求成功返回的结果.
+            :rtype: tuple(dict, dict)
 
             .. code-block:: python
 
@@ -709,10 +703,8 @@ class CosVectorsClient(CosS3Client):
             :type ReturnMetaData: bool
             :param kwargs: 设置上传的headers.
             :type kwargs: dict
-            :return: response header.
-            :rtype: dict
-            :return: 请求成功返回的结果,dict类型.
-            :rtype: dict
+            :return: response header 和请求成功返回的结果.
+            :rtype: tuple(dict, dict)
 
             .. code-block:: python
 
@@ -769,7 +761,7 @@ class CosVectorsClient(CosS3Client):
             :param Bucket: 向量存储桶名称.
             :type Bucket: string
             :param Policy: 策略内容.
-            :type Policy: string
+            :type Policy: string or dict
             :param kwargs: 设置上传的headers.
             :type kwargs: dict
             :return: response header.
@@ -791,10 +783,9 @@ class CosVectorsClient(CosS3Client):
         data = dict()
         # 构造请求数据
         policy_str = Policy  # 策略内容, 可以是json格式字符串或者json格式字典
-        policy_type = type(policy_str)
-        if policy_type != str and policy_type != dict:
+        if not isinstance(policy_str, string_types) and not isinstance(policy_str, dict):
             raise CosClientError("Policy must be a json format string or json format dict")
-        if policy_type == dict:
+        if isinstance(policy_str, dict):
             policy_str = json.dumps(policy_str)
             
         data["policy"] = policy_str
@@ -822,10 +813,8 @@ class CosVectorsClient(CosS3Client):
             :type Bucket: string
             :param kwargs: 设置上传的headers.
             :type kwargs: dict
-            :return: response header.
-            :rtype: dict
-            :return: 请求成功返回的结果,dict类型.
-            :rtype: dict
+            :return: response header 和请求成功返回的结果, policy字段为字符串, 可解析为dict.
+            :rtype: tuple(dict, dict)
 
             .. code-block:: python
 

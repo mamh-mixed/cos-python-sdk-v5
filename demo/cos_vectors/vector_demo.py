@@ -23,7 +23,7 @@ config = CosConfig(
     SecretId=secret_id, 
     SecretKey=secret_key,
     Scheme=scheme,
-    Domain="vectors.ap-guangzhou.internal.tencentcos.com",
+    Domain="vectors.ap-guangzhou.coslake.com",
     Token=token
 )
 client = CosVectorsClient(config)
