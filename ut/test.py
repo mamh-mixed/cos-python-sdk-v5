@@ -639,10 +639,16 @@ def test_create_head_delete_bucket():
     """创建一个bucket,head它是否存在,最后删除一个空bucket"""
     bucket_id = str(random.randint(0, 1000)) + str(random.randint(0, 1000))
     bucket_name = 'buckettest' + bucket_id + '-' + APPID
-    response = client.create_bucket(
-        Bucket=bucket_name,
-        ACL='public-read'
-    )
+    try:
+        response = client.create_bucket(
+            Bucket=bucket_name,
+            ACL='public-read'
+        )
+    except CosServiceError as e:
+        if e.get_error_code() == 'TooManyBuckets' or e.get_error_code() == 'PolicyFull':
+            return
+        raise e
+
     response = client.head_bucket(
         Bucket=bucket_name
     )
@@ -664,10 +670,9 @@ def test_create_head_delete_maz_ofs_bucket():
             ACL='public-read'
         )
     except CosServiceError as e:
-        if e.get_error_code() == 'TooManyBuckets':
+        if e.get_error_code() == 'TooManyBuckets' or e.get_error_code() == 'PolicyFull':
             return
-        else:
-            raise e
+        raise e
 
     response = client.head_bucket(
         Bucket=bucket_name
@@ -1720,7 +1725,7 @@ def test_put_get_delete_bucket_domain_certificate():
             DomainConfiguration=domain_config
         )
     except CosServiceError as e:
-        if e.get_error_code() == "RecordAlreadyExist":
+        if e.get_error_code() == "RecordAlreadyExist" or e.get_error_code() == "DomainAuditFailed":
             print_error_msg(e)
         else:
             raise e
