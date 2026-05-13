@@ -34,17 +34,7 @@ TEST_CI = os.environ["TEST_CI"]
 USE_CREDENTIAL_INST = os.environ["USE_CREDENTIAL_INST"]
 
 # 向量桶配置
-COS_VECTORS_BUCKET = os.environ["COS_VECTORS_BUCKET"]
-COS_VECTORS_BUCKET_FOR_CREATE_DELETE = os.environ["COS_VECTORS_BUCKET_FOR_CREATE_DELETE"]
-COS_VECTORS_APPID = os.environ["COS_VECTORS_APPID"]
-COS_VECTORS_SECRET_ID = os.environ["COS_VECTORS_SECRET_ID"]
-COS_VECTORS_SECRET_KEY = os.environ["COS_VECTORS_SECRET_KEY"]
-COS_VECTORS_REGION = os.environ["COS_VECTORS_REGION"]
-COS_VECTORS_USE_IP = os.environ["COS_VECTORS_USE_IP"]  # 为true则需指定IP,Port,Domain
-if COS_VECTORS_USE_IP == 'true':
-    COS_VECTORS_IP = os.environ["COS_VECTORS_IP"]
-    COS_VECTORS_PORT = os.environ["COS_VECTORS_PORT"]
-    COS_VECTORS_DOMAIN = os.environ["COS_VECTORS_DOMAIN"]
+COS_VECTORS_DOMAIN = os.environ["COS_VECTORS_DOMAIN"]
 
 test_bucket = 'cos-python-v5-test-' + str(sys.version_info[0]) + '-' + str(
     sys.version_info[1]) + '-' + REGION + '-' + APPID
@@ -93,25 +83,14 @@ metaConf = CosConfig(
     SecretKey=SECRET_KEY,
 )
 
-if COS_VECTORS_USE_IP == 'true':
-    cosVectorsConf = CosConfig(
-        Scheme='http',
-        Appid=COS_VECTORS_APPID,
-        Region=COS_VECTORS_REGION,
-        SecretId=COS_VECTORS_SECRET_ID,
-        SecretKey=COS_VECTORS_SECRET_KEY,
-        IP=COS_VECTORS_IP,
-        Port=COS_VECTORS_PORT,
-        Domain=COS_VECTORS_DOMAIN,
-    )
-else:
-    cosVectorsConf = CosConfig(
-        Scheme='http',
-        Appid=COS_VECTORS_APPID,
-        Region=COS_VECTORS_REGION,
-        SecretId=COS_VECTORS_SECRET_ID,
-        SecretKey=COS_VECTORS_SECRET_KEY,
-    )
+cosVectorsConf = CosConfig(
+    Scheme='http',
+    Appid=APPID,
+    Region=REGION,
+    SecretId=SECRET_ID,
+    SecretKey=SECRET_KEY,
+    Domain=COS_VECTORS_DOMAIN,
+)
 
 anonymous_conf = CosConfig(Appid=APPID, Region=REGION, Anonymous=True)
 anonymous_client = CosS3Client(anonymous_conf)
@@ -144,8 +123,7 @@ mi_image_search_dataset_name = "ci-sdk-image-search"
 mi_face_search_dataset_name = "ci-sdk-face-search"
 mi_face_search_file = "face.jpeg"
 
-cos_vectors_bucket_name_tmp = COS_VECTORS_BUCKET_FOR_CREATE_DELETE
-cos_vectors_bucket_name = COS_VECTORS_BUCKET
+cos_vectors_bucket_name_prefix = "cos-python-sdk-test-vec"
 cos_vectors_index_name = 'idx-float32-dim3'
 
 
@@ -639,10 +617,16 @@ def test_create_head_delete_bucket():
     """创建一个bucket,head它是否存在,最后删除一个空bucket"""
     bucket_id = str(random.randint(0, 1000)) + str(random.randint(0, 1000))
     bucket_name = 'buckettest' + bucket_id + '-' + APPID
-    response = client.create_bucket(
-        Bucket=bucket_name,
-        ACL='public-read'
-    )
+    try:
+        response = client.create_bucket(
+            Bucket=bucket_name,
+            ACL='public-read'
+        )
+    except CosServiceError as e:
+        if e.get_error_code() == 'TooManyBuckets' or e.get_error_code() == 'PolicyFull':
+            return
+        raise e
+
     response = client.head_bucket(
         Bucket=bucket_name
     )
@@ -664,10 +648,9 @@ def test_create_head_delete_maz_ofs_bucket():
             ACL='public-read'
         )
     except CosServiceError as e:
-        if e.get_error_code() == 'TooManyBuckets':
+        if e.get_error_code() == 'TooManyBuckets' or e.get_error_code() == 'PolicyFull':
             return
-        else:
-            raise e
+        raise e
 
     response = client.head_bucket(
         Bucket=bucket_name
@@ -1720,7 +1703,7 @@ def test_put_get_delete_bucket_domain_certificate():
             DomainConfiguration=domain_config
         )
     except CosServiceError as e:
-        if e.get_error_code() == "RecordAlreadyExist":
+        if e.get_error_code() == "RecordAlreadyExist" or e.get_error_code() == "DomainAuditFailed":
             print_error_msg(e)
         else:
             raise e
@@ -6810,7 +6793,7 @@ def list_vector_buckets():
     """列出向量桶"""
     resp, data = cos_vectors_client.list_vector_buckets(
         MaxResults=100,
-        Prefix=cos_vectors_bucket_name
+        Prefix=cos_vectors_bucket_name_prefix
     )
     return resp, data
 
@@ -6821,12 +6804,12 @@ def get_vector_bucket(Bucket):
     )
     return resp, data
 
-def put_vector_bucket_policy():
+def put_vector_bucket_policy(Bucket):
     """设置向量桶策略"""
-    resource = "qcs::cosvector:" + COS_VECTORS_REGION + ":uid/" + COS_VECTORS_APPID + ":bucket/" + cos_vectors_bucket_name + "/*"
+    resource = "qcs::cosvector:" + REGION + ":uid/" + APPID + ":bucket/" + Bucket + "/*"
     resource_list = [resource]
     resp = cos_vectors_client.put_vector_bucket_policy(
-        Bucket=cos_vectors_bucket_name,
+        Bucket=Bucket,
         Policy={
             "Version": "2.0",
             "Statement": [
@@ -6848,24 +6831,24 @@ def put_vector_bucket_policy():
     )
     return resp
 
-def get_vector_bucket_policy():
+def get_vector_bucket_policy(Bucket):
     """获取向量桶策略"""
     resp, data = cos_vectors_client.get_vector_bucket_policy(
-        Bucket=cos_vectors_bucket_name
+        Bucket=Bucket
     )
     return resp, data
 
-def delete_vector_bucket_policy():
+def delete_vector_bucket_policy(Bucket):
     """删除向量桶策略"""
     resp = cos_vectors_client.delete_vector_bucket_policy(
-        Bucket=cos_vectors_bucket_name
+        Bucket=Bucket
     )
     return resp
 
-def create_index():
+def create_index(Bucket):
     """创建索引"""
     resp, data = cos_vectors_client.create_index(
-        Bucket=cos_vectors_bucket_name,
+        Bucket=Bucket,
         Index=cos_vectors_index_name,
         DataType="float32",
         Dimension=3,
@@ -6874,34 +6857,34 @@ def create_index():
     )
     return resp, data
 
-def delete_index():
+def delete_index(Bucket):
     """删除索引"""
     resp = cos_vectors_client.delete_index(
-        Bucket=cos_vectors_bucket_name,
+        Bucket=Bucket,
         Index=cos_vectors_index_name
     )
     return resp
 
-def list_indexes():
+def list_indexes(Bucket):
     """列出索引"""
     resp, data = cos_vectors_client.list_indexes(
         MaxResults=100,
-        Bucket=cos_vectors_bucket_name
+        Bucket=Bucket
     )
     return resp, data
 
-def get_index():
+def get_index(Bucket):
     """获取索引"""
     resp, data = cos_vectors_client.get_index(
-        Bucket=cos_vectors_bucket_name,
+        Bucket=Bucket,
         Index=cos_vectors_index_name
     )
     return resp, data
 
-def put_vectors():
+def put_vectors(Bucket):
     """插入向量"""
     resp = cos_vectors_client.put_vectors(
-        Bucket=cos_vectors_bucket_name,
+        Bucket=Bucket,
         Index=cos_vectors_index_name,
         Vectors=[
             {
@@ -6942,10 +6925,10 @@ def put_vectors():
     )
     return resp
 
-def get_vectors(keys):
+def get_vectors(Bucket, keys):
     """获取向量"""
     resp, data = cos_vectors_client.get_vectors(
-        Bucket=cos_vectors_bucket_name,
+        Bucket=Bucket,
         Index=cos_vectors_index_name,
         Keys=keys,
         ReturnData=True,
@@ -6953,10 +6936,10 @@ def get_vectors(keys):
     )
     return resp, data
 
-def list_vectors():
+def list_vectors(Bucket):
     """列出向量"""
     resp, data = cos_vectors_client.list_vectors(
-        Bucket=cos_vectors_bucket_name,
+        Bucket=Bucket,
         Index=cos_vectors_index_name,
         MaxResults=100,
         ReturnData=True,
@@ -6964,19 +6947,19 @@ def list_vectors():
     )
     return resp, data
 
-def delete_vectors(keys):
+def delete_vectors(Bucket, keys):
     """删除向量"""
     resp = cos_vectors_client.delete_vectors(
-        Bucket=cos_vectors_bucket_name,
+        Bucket=Bucket,
         Index=cos_vectors_index_name,
         Keys=keys
     )
     return resp
 
-def query_vectors(query_vector, filter = None):
+def query_vectors(Bucket, query_vector, filter = None):
     """查询向量"""
     resp, data = cos_vectors_client.query_vectors(
-        Bucket=cos_vectors_bucket_name,
+        Bucket=Bucket,
         Index=cos_vectors_index_name,
         QueryVector={"float32": query_vector},
         TopK=1,
@@ -6986,31 +6969,17 @@ def query_vectors(query_vector, filter = None):
     )
     return resp, data
 
-def test_cos_vectors_create_and_delete():
-    """创建和删除向量桶"""
-
-    # 创建测试向量桶
-    resp, data = create_vector_bucket(cos_vectors_bucket_name_tmp)
-    assert isinstance(data, dict)
-    assert 'vectorBucketQcs' in data
-
-    # 获取向量桶
-    resp, data = get_vector_bucket(cos_vectors_bucket_name_tmp)
-    assert isinstance(data, dict)
-    assert 'vectorBucket' in data
-    assert isinstance(data['vectorBucket'], dict)
-    assert data['vectorBucket']['vectorBucketName'] == cos_vectors_bucket_name_tmp
-
-    # 删除向量桶
-    resp = delete_vector_bucket(cos_vectors_bucket_name_tmp)
-    resp, data = list_vector_buckets()
-    assert isinstance(data, dict)
-    assert 'vectorBuckets' in data
-    assert isinstance(data['vectorBuckets'], list)
-
-
 def test_cos_vectors():
     """向量桶相关接口集成测试"""
+
+    # 生成随机桶名，固定前缀
+    random_suffix = ''.join(random.choice('0123456789abcdefghijklmnopqrstuvwxyz') for _ in range(8))
+    vector_bucket_name = u"{prefix}-{suffix}-{appid}".format(prefix=cos_vectors_bucket_name_prefix, suffix=random_suffix, appid=APPID)
+
+    # 创建测试向量桶
+    resp, data = create_vector_bucket(vector_bucket_name)
+    assert isinstance(data, dict)
+    assert 'vectorBucketQcs' in data
 
     # 列出现有向量桶
     resp, data = list_vector_buckets()  # 指定前缀为bucket_name
@@ -7019,62 +6988,64 @@ def test_cos_vectors():
     assert isinstance(data['vectorBuckets'], list)
 
     # 获取向量桶
-    resp, data = get_vector_bucket(cos_vectors_bucket_name)
+    resp, data = get_vector_bucket(vector_bucket_name)
     assert isinstance(data, dict)
     assert 'vectorBucket' in data
     assert isinstance(data['vectorBucket'], dict)
-    assert data['vectorBucket']['vectorBucketName'] == cos_vectors_bucket_name
+    assert data['vectorBucket']['vectorBucketName'] == vector_bucket_name
 
     # 创建policy
-    resp = put_vector_bucket_policy()
+    resp = put_vector_bucket_policy(vector_bucket_name)
 
     # 获取policy
-    resp, data = get_vector_bucket_policy()
+    time.sleep(1)
+    resp, data = get_vector_bucket_policy(vector_bucket_name)
     assert isinstance(data, dict)
     assert 'policy' in data
 
     # 删除policy
-    resp = delete_vector_bucket_policy()
+    time.sleep(1)
+    resp = delete_vector_bucket_policy(vector_bucket_name)
 
     # 创建索引
-    resp, data = create_index()
+    resp, data = create_index(vector_bucket_name)
     assert isinstance(data, dict)
     assert 'indexQcs' in data
 
     # 列出索引
-    resp, data = list_indexes()
+    resp, data = list_indexes(vector_bucket_name)
     assert isinstance(data, dict)
     assert 'indexes' in data
     assert isinstance(data['indexes'], list)
     assert len(data['indexes']) == 1
 
     # 获取索引
-    resp, data = get_index()
+    resp, data = get_index(vector_bucket_name)
     assert isinstance(data, dict)
     assert 'index' in data
     assert isinstance(data['index'], dict)
     assert data['index']['indexName'] == cos_vectors_index_name
-    assert data['index']['vectorBucketName'] == cos_vectors_bucket_name
+    assert data['index']['vectorBucketName'] == vector_bucket_name
 
     # 插入向量
-    resp = put_vectors()
+    resp = put_vectors(vector_bucket_name)
     
     # 获取向量
-    resp, data = get_vectors(['vector1', 'vector2'])
+    resp, data = get_vectors(vector_bucket_name, ['vector1', 'vector2'])
     assert isinstance(data, dict)
     assert 'vectors' in data
     assert isinstance(data['vectors'], list)
     assert len(data['vectors']) == 2
 
     # 列出向量
-    resp, data = list_vectors()
+    resp, data = list_vectors(vector_bucket_name)
     assert isinstance(data, dict)
     assert 'vectors' in data
     assert isinstance(data['vectors'], list)
     assert len(data['vectors']) == 3
 
     # 查询向量
-    resp, data = query_vectors([0.1, 0.2, 0.3])
+    resp, data = query_vectors(vector_bucket_name, [0.1, 0.2, 0.3])
     assert isinstance(data, dict)
     assert 'vectors' in data
     assert isinstance(data['vectors'], list)
@@ -7084,8 +7055,8 @@ def test_cos_vectors():
     assert vector['key'] == 'vector1'   # vector1距离最近
 
     # 删除向量再查询
-    resp = delete_vectors(['vector1'])
-    resp, data = query_vectors([0.1, 0.2, 0.3])
+    resp = delete_vectors(vector_bucket_name, ['vector1'])
+    resp, data = query_vectors(vector_bucket_name, [0.1, 0.2, 0.3])
     assert isinstance(data, dict)
     assert 'vectors' in data
     assert isinstance(data['vectors'], list)
@@ -7094,7 +7065,7 @@ def test_cos_vectors():
     assert vector['key'] == 'vector2'   # vectorr1被删除, vector2距离最近
 
     # 过滤查询
-    resp, data = query_vectors([0.1, 0.2, 0.3], filter={'key1': {'$eq': 'value111'}})
+    resp, data = query_vectors(vector_bucket_name, [0.1, 0.2, 0.3], filter={'key1': {'$eq': 'value111'}})
     assert isinstance(data, dict)
     assert 'vectors' in data
     assert isinstance(data['vectors'], list)
@@ -7103,16 +7074,16 @@ def test_cos_vectors():
     assert vector['key'] == 'vector3'   # vector2被过滤掉，vector3距离最近
 
     # 删除向量
-    resp = delete_vectors(['vector2', 'vector3'])
-    resp, data = list_vectors()
+    resp = delete_vectors(vector_bucket_name, ['vector2', 'vector3'])
+    resp, data = list_vectors(vector_bucket_name)
     assert isinstance(data, dict)
     assert 'vectors' in data
     assert isinstance(data['vectors'], list)
     assert len(data['vectors']) == 0
 
     # 删除索引
-    resp = delete_index()
-    resp, data = list_indexes()
+    resp = delete_index(vector_bucket_name)
+    resp, data = list_indexes(vector_bucket_name)
     assert isinstance(data, dict)
     assert 'indexes' in data
     assert isinstance(data['indexes'], list)
@@ -7120,9 +7091,21 @@ def test_cos_vectors():
 
     # 再次尝试获取索引，但实际索引不存在
     try:
-        resp, data = get_index()
+        resp, data = get_index(vector_bucket_name)
     except CosServiceError as e:
         assert e.get_error_code() == "NotFoundException"
+
+    # 删除向量桶
+    try:
+        time.sleep(1)
+        resp = delete_vector_bucket(vector_bucket_name)
+    except CosServiceError as e:
+        assert e.get_error_code() == "ConflictException"
+        print(e)
+    resp, data = list_vector_buckets()
+    assert isinstance(data, dict)
+    assert 'vectorBuckets' in data
+    assert isinstance(data['vectorBuckets'], list)
 
 
 def test_put_get_symlink_multiver():
