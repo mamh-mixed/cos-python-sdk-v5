@@ -128,6 +128,7 @@ cos_vectors_index_name = 'idx-float32-dim3'
 
 
 def _create_test_bucket(test_bucket, create_region=None):
+    bucket_client = None
     try:
         if create_region is None:
             response = client.create_bucket(
@@ -143,14 +144,12 @@ def _create_test_bucket(test_bucket, create_region=None):
             response = bucket_client.create_bucket(
                 Bucket=test_bucket,
             )
-    except Exception as e:
-        if e.get_error_code() == 'BucketAlreadyOwnedByYou':
-            print('BucketAlreadyOwnedByYou')
-        elif e.get_error_code() == 'BucketAlreadyExists':
-            print('BucketAlreadyExists')
+    except CosServiceError as e:
+        if e.get_error_code() in ('BucketAlreadyOwnedByYou', 'BucketAlreadyExists'):
+            pass
         else:
             raise e
-    return None
+    return bucket_client
 
 
 def _clear_and_delete_bucket(_client, _bucket):
@@ -2066,6 +2065,11 @@ def test_put_get_delete_bucket_referer():
 
 
 def test_put_get_delete_bucket_response_control():
+    tmp_test_bucket = 'cos-python-sdk-response-control-' + APPID
+    tmp_region = 'ap-shanghai'
+    tmp_client = _create_test_bucket(tmp_test_bucket, tmp_region)
+    assert tmp_client
+
     """测试设置获取删除bucket响应内容控制规则"""
     expected_params = [
         'response-content-type',
@@ -2081,14 +2085,14 @@ def test_put_get_delete_bucket_response_control():
         }
     }
     # 设置响应内容控制规则
-    response = client.put_bucket_response_control(
-        Bucket=test_bucket,
+    response = tmp_client.put_bucket_response_control(
+        Bucket=tmp_test_bucket,
         ResponseControlConfiguration=response_control_config
     )
     time.sleep(4)
     # 获取响应内容控制规则
-    response = client.get_bucket_response_control(
-        Bucket=test_bucket,
+    response = tmp_client.get_bucket_response_control(
+        Bucket=tmp_test_bucket,
     )
     assert response is not None
     assert 'ControlParamList' in response
@@ -2096,10 +2100,9 @@ def test_put_get_delete_bucket_response_control():
     assert isinstance(response['ControlParamList']['Param'], list)
     assert sorted(response['ControlParamList']['Param']) == sorted(expected_params)
     # 删除响应内容控制规则
-    response = client.delete_bucket_response_control(
-        Bucket=test_bucket,
+    response = tmp_client.delete_bucket_response_control(
+        Bucket=tmp_test_bucket,
     )
-    time.sleep(4)
 
 
 def test_put_get_traffic_limit():
