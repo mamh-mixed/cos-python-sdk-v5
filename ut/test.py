@@ -2065,6 +2065,43 @@ def test_put_get_delete_bucket_referer():
     assert response['RefererConfiguration'] is None
 
 
+def test_put_get_delete_bucket_response_control():
+    """测试设置获取删除bucket响应内容控制规则"""
+    expected_params = [
+        'response-content-type',
+        'response-content-disposition',
+        'response-cache-control',
+        'response-content-encoding',
+        'response-content-language',
+        'response-expires'
+    ]
+    response_control_config = {
+        'ControlParamList': {
+            'Param': expected_params
+        }
+    }
+    # 设置响应内容控制规则
+    response = client.put_bucket_response_control(
+        Bucket=test_bucket,
+        ResponseControlConfiguration=response_control_config
+    )
+    time.sleep(4)
+    # 获取响应内容控制规则
+    response = client.get_bucket_response_control(
+        Bucket=test_bucket,
+    )
+    assert response is not None
+    assert 'ControlParamList' in response
+    assert 'Param' in response['ControlParamList']
+    assert isinstance(response['ControlParamList']['Param'], list)
+    assert sorted(response['ControlParamList']['Param']) == sorted(expected_params)
+    # 删除响应内容控制规则
+    response = client.delete_bucket_response_control(
+        Bucket=test_bucket,
+    )
+    time.sleep(4)
+
+
 def test_put_get_traffic_limit():
     """测试上传下载接口的单链接限速"""
     traffic_test_key = 'traffic_test'
@@ -7242,6 +7279,7 @@ if __name__ == "__main__":
     test_put_get_delete_bucket_tagging()
     test_put_get_delete_object_tagging()
     test_put_get_delete_bucket_referer()
+    test_put_get_delete_bucket_response_control()
     test_put_get_bucket_intelligenttiering()
     test_put_get_delete_bucket_domain_certificate()
     test_put_get_traffic_limit()
